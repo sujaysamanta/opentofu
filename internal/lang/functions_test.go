@@ -541,6 +541,17 @@ func TestFunctions(t *testing.T) {
 			},
 		},
 
+		"flip_sensitive": {
+			{
+				`flip_sensitive(1)`,
+				cty.NumberIntVal(1).Mark(marks.Sensitive),
+			},
+			{
+				`flip_sensitive(sensitive(1))`,
+				cty.NumberIntVal(1),
+			},
+		},
+
 		"join": {
 			{
 				`join(" ", ["Hello", "World"])`,

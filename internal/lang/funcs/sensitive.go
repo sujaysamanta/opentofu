@@ -79,6 +79,39 @@ var IsSensitiveFunc = function.New(&function.Spec{
 	},
 })
 
+// FlipSensitiveFunc flips the sensitivity of a value.
+// If the input is sensitive, it returns a non-sensitive value.
+// If the input is non-sensitive, it returns a sensitive value.
+var FlipSensitiveFunc = function.New(&function.Spec{
+	Params: []function.Parameter{
+		{
+			Name:             "value",
+			Type:             cty.DynamicPseudoType,
+			AllowUnknown:     true,
+			AllowNull:        true,
+			AllowMarked:      true,
+			AllowDynamicType: true,
+		},
+	},
+	Type: func(args []cty.Value) (cty.Type, error) {
+		// This function only affects the value's marks, so the result
+		// type is always the same as the argument type.
+		return args[0].Type(), nil
+	},
+	Impl: func(args []cty.Value, retType cty.Type) (ret cty.Value, err error) {
+		v := args[0]
+		if v.HasMark(marks.Sensitive) {
+			// If the value is sensitive, make it non-sensitive
+			rawVal, valueMarks := v.Unmark()
+			delete(valueMarks, marks.Sensitive)
+			return rawVal.WithMarks(valueMarks), nil
+		} else {
+			// If the value is not sensitive, make it sensitive
+			return v.Mark(marks.Sensitive), nil
+		}
+	},
+})
+
 func Sensitive(v cty.Value) (cty.Value, error) {
 	return SensitiveFunc.Call([]cty.Value{v})
 }
@@ -89,4 +122,8 @@ func Nonsensitive(v cty.Value) (cty.Value, error) {
 
 func IsSensitive(v cty.Value) (cty.Value, error) {
 	return IsSensitiveFunc.Call([]cty.Value{v})
+}
+
+func FlipSensitive(v cty.Value) (cty.Value, error) {
+	return FlipSensitiveFunc.Call([]cty.Value{v})
 }

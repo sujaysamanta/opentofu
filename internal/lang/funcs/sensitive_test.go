@@ -230,3 +230,122 @@ func TestIsSensitive(t *testing.T) {
 		})
 	}
 }
+
+func TestFlipSensitive(t *testing.T) {
+	tests := []struct {
+		Input         cty.Value
+		WantErr       string
+		WantSensitive bool
+	}{
+		// Test cases for non-sensitive inputs (should become sensitive)
+		{
+			cty.NumberIntVal(1),
+			``,
+			true,
+		},
+		{
+			cty.StringVal("hello"),
+			``,
+			true,
+		},
+		{
+			cty.ListVal([]cty.Value{cty.NumberIntVal(1)}),
+			``,
+			true,
+		},
+		{
+			cty.DynamicVal,
+			``,
+			true,
+		},
+		{
+			cty.UnknownVal(cty.String),
+			``,
+			true,
+		},
+		{
+			cty.NullVal(cty.EmptyObject),
+			``,
+			true,
+		},
+
+		// Test cases for sensitive inputs (should become non-sensitive)
+		{
+			cty.NumberIntVal(1).Mark(marks.Sensitive),
+			``,
+			false,
+		},
+		{
+			cty.StringVal("hello").Mark(marks.Sensitive),
+			``,
+			false,
+		},
+		{
+			cty.ListVal([]cty.Value{cty.NumberIntVal(1)}).Mark(marks.Sensitive),
+			``,
+			false,
+		},
+		{
+			cty.DynamicVal.Mark(marks.Sensitive),
+			``,
+			false,
+		},
+		{
+			cty.UnknownVal(cty.String).Mark(marks.Sensitive),
+			``,
+			false,
+		},
+		{
+			cty.NullVal(cty.EmptyObject).Mark(marks.Sensitive),
+			``,
+			false,
+		},
+
+		// Test case for value with multiple marks
+		{
+			cty.NumberIntVal(1).Mark(marks.Sensitive).Mark("other"),
+			``,
+			false,
+		},
+		{
+			cty.NumberIntVal(1).Mark("other"),
+			``,
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("flip_sensitive(%#v)", test.Input), func(t *testing.T) {
+			got, err := FlipSensitive(test.Input)
+
+			// Handle an error case
+			if test.WantErr != "" {
+				if err == nil {
+					t.Fatal("expected error but got none")
+				}
+				if errMsg := err.Error(); errMsg != test.WantErr {
+					t.Fatalf("wrong error\ngot:  %s\nwant: %s", errMsg, test.WantErr)
+				}
+				return
+			}
+
+			// Handle a success case
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+
+			// Verify sensitivity state
+			hasSensitiveMark := got.HasMark(marks.Sensitive)
+			if hasSensitiveMark != test.WantSensitive {
+				t.Errorf("unexpected sensitivity state: got %v, want %v", hasSensitiveMark, test.WantSensitive)
+			}
+
+			// Verify value equality (ignoring marks)
+			gotRaw, _ := got.Unmark()
+			wantRaw, _ := test.Input.Unmark()
+			if !gotRaw.RawEquals(wantRaw) {
+				t.Errorf("values differ after unmarking\ngot:  %#v\nwant: %#v", gotRaw, wantRaw)
+			}
+		})
+	}
+}
